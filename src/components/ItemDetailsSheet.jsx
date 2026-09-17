@@ -26,7 +26,7 @@ export default function ItemDetailsSheet({ item, onClose }) {
   const { addToCart } = useCart();
   const [selections, setSelections] = useState({});
 
-  // ⚠ استخراج الداتا بشكل دفاعي عشان يشتغل مع الـ MongoDB والـ Mock
+  // استخراج الداتا بشكل دفاعي عشان يشتغل مع الـ MongoDB والـ Mock
   const displayName = item ? item.name?.ar ?? item.name : '';
   const displayDescription = item ? item.description?.ar ?? item.description : '';
   const basePrice = item ? item.basePrice ?? item.price ?? 0 : 0;
@@ -40,11 +40,14 @@ export default function ItemDetailsSheet({ item, onClose }) {
     optionGroups.forEach((group) => {
       const groupId = group._id ?? group.id;
       const choices = group.choices || group.options || [];
-      initial[groupId] = group.type === 'single' ? choices[0]?._id ?? choices[0]?.id ?? null : [];
+      const isSingle = group.type === 'single' || group.isRequired || group.required;
+      // لو الاختيار إجباري/فردي، اختار أول عنصر افتراضياً، غير كده خليها مصفوفة فاضية
+      initial[groupId] = isSingle ? choices[0]?._id ?? choices[0]?.id ?? null : [];
     });
     setSelections(initial);
   }, [item, optionGroups]);
 
+  // حساب السعر الإجمالي
   const totalPrice = useMemo(() => {
     if (!item) return 0;
     let total = basePrice;
@@ -53,12 +56,14 @@ export default function ItemDetailsSheet({ item, onClose }) {
       const groupId = group._id ?? group.id;
       const choices = group.choices || group.options || [];
       const selected = selections[groupId];
+      const isSingle = group.type === 'single' || group.isRequired || group.required;
       
-      if (group.type === 'single') {
+      if (isSingle) {
         const opt = choices.find((o) => (o._id ?? o.id) === selected);
         if (opt) total += opt.additionalPrice ?? opt.priceModifier ?? 0;
       } else {
-        (selected || []).forEach((sId) => {
+        // التأكد إنها مصفوفة قبل عمل لوب عليها
+        (Array.isArray(selected) ? selected : []).forEach((sId) => {
           const opt = choices.find((o) => (o._id ?? o.id) === sId);
           if (opt) total += opt.additionalPrice ?? opt.priceModifier ?? 0;
         });
@@ -76,12 +81,13 @@ export default function ItemDetailsSheet({ item, onClose }) {
       const groupId = group._id ?? group.id;
       const choices = group.choices || group.options || [];
       const selected = selections[groupId];
+      const isSingle = group.type === 'single' || group.isRequired || group.required;
       
-      if (group.type === 'single') {
+      if (isSingle) {
         const opt = choices.find((o) => (o._id ?? o.id) === selected);
         if (opt) list.push({ name: opt.name?.ar ?? opt.name, priceModifier: opt.additionalPrice ?? opt.priceModifier ?? 0 });
       } else {
-        (selected || []).forEach((sId) => {
+        (Array.isArray(selected) ? selected : []).forEach((sId) => {
           const opt = choices.find((o) => (o._id ?? o.id) === sId);
           if (opt) list.push({ name: opt.name?.ar ?? opt.name, priceModifier: opt.additionalPrice ?? opt.priceModifier ?? 0 });
         });
@@ -106,7 +112,7 @@ export default function ItemDetailsSheet({ item, onClose }) {
 
   const handleMultiToggle = (groupId, optionId) => {
     setSelections((prev) => {
-      const current = prev[groupId] || [];
+      const current = Array.isArray(prev[groupId]) ? prev[groupId] : [];
       const next = current.includes(optionId)
         ? current.filter((id) => id !== optionId)
         : [...current, optionId];
@@ -181,11 +187,13 @@ export default function ItemDetailsSheet({ item, onClose }) {
                           const optId = opt._id ?? opt.id;
                           const optName = opt.name?.ar ?? opt.name;
                           const optPrice = opt.additionalPrice ?? opt.priceModifier ?? 0;
-                          const isSingle = group.type === 'single';
+                          
+                          // تحديد إن كان الاختيار فردي (إجباري) أو متعدد
+                          const isSingle = group.type === 'single' || isRequired;
                           
                           const checked = isSingle
                             ? selections[groupId] === optId
-                            : (selections[groupId] || []).includes(optId);
+                            : (Array.isArray(selections[groupId]) ? selections[groupId] : []).includes(optId);
 
                           return (
                             <label
