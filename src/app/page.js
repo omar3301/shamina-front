@@ -2,24 +2,28 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
+import { motion } from 'framer-motion';
 import ItemDetailsSheet from '@/components/ItemDetailsSheet';
 import { menuApi } from '@/lib/api';
 
-// The `category` field on a live MenuItem is a Mongo ObjectId reference,
-// and the menu API populates it (`.populate('category')`), so at runtime
-// `item.category` is an object like { _id, name: { ar, en }, slug, ... } —
-// not a plain string. These helpers handle both shapes safely.
+// --- Helpers ---
 function getCategoryId(category) {
   if (!category) return null;
   if (typeof category === 'string') return category;
   return category._id || category.slug || null;
 }
-
 function getCategoryLabel(category) {
   if (!category) return '';
   if (typeof category === 'string') return category;
   return category.name?.ar || category.name?.en || category.slug || '';
 }
+function getItemName(item) { return item.name?.ar || item.name || ''; }
+function getItemPrice(item) { return item.basePrice ?? item.price ?? null; }
+function getItemImage(item) { return item.images?.[0] || item.image || null; }
+
+// Brand Colors
+const BRAND_YELLOW = '#F5B301'; // لون أقرب لأصفر شامينا
+const BRAND_RED = '#8B0000'; // اللون العنابي اللي في أطراف البانر
 
 export default function HomePage() {
   const [items, setItems] = useState([]);
@@ -31,11 +35,9 @@ export default function HomePage() {
 
   useEffect(() => {
     let ignore = false;
-
     async function loadMenu() {
       try {
         setIsLoading(true);
-        setLoadError(false);
         const res = await menuApi.getAll();
         if (!ignore) setItems(res.data.items ?? []);
       } catch (err) {
@@ -44,16 +46,10 @@ export default function HomePage() {
         if (!ignore) setIsLoading(false);
       }
     }
-
     loadMenu();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, []);
 
-  // Dynamic category tabs — extracted from whatever categories actually
-  // exist on the fetched items, never hardcoded. Deduped by id since
-  // `category` is a possibly-populated object, not a string.
   const categories = useMemo(() => {
     const seen = new Map();
     items.forEach((item) => {
@@ -68,200 +64,178 @@ export default function HomePage() {
     return items.filter((i) => getCategoryId(i.category) === activeCategory);
   }, [items, activeCategory]);
 
-  // "Quick Offers" — reuses the already-fetched `items`, filtered to
-  // whatever's flagged isFeaturedOnHome.
   const offerItems = useMemo(() => items.filter((i) => i.isFeaturedOnHome), [items]);
 
-  function openSheet(item) {
-    setSelectedItem(item);
-    setIsSheetOpen(true);
-  }
-
-  function closeSheet() {
-    setIsSheetOpen(false);
-  }
-
   return (
-    <main className="min-h-screen bg-[#f8f9fa] pb-24">
-      {/* ⚠ LAYOUT CLEANUP: the Stories row (circular icons) and the old
-          light-themed offers section both lived inside <HeroSection />,
-          which isn't part of what was shared for this change. Since both
-          were asked to be removed and nothing else about HeroSection was
-          referenced, the import/usage has been dropped entirely here. If
-          HeroSection rendered anything else you want to keep, say so and
-          share that file — right now nothing calls it anymore. */}
+    // الخلفية رمادي داكن جداً (أشيك من الأسود الصريح) ومريحة للعين
+    <main className="min-h-screen bg-[#0c0a09] pb-24 text-white font-sans">
+      
+      {/* 1. Hero Section (Elegant & Static) */}
+      <section className="relative w-full overflow-hidden bg-[#141210] border-b border-white/5 pt-12 pb-16 px-4 md:px-8">
+        {/* لمسة لونية خفيفة في الخلفية */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#F5B301] opacity-[0.03] blur-[100px] rounded-full pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#8B0000] opacity-[0.04] blur-[100px] rounded-full pointer-events-none"></div>
 
+        <div className="max-w-7xl mx-auto flex flex-col-reverse md:flex-row items-center justify-between gap-8 relative z-10">
+          
+          <div className="flex-1 text-center md:text-right mt-6 md:mt-0">
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
+              className="text-4xl md:text-6xl font-black text-white leading-tight"
+            >
+              شامينا المداح<br/>
+              <span style={{ color: BRAND_YELLOW }}>أصل الطعم السوري</span>
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.6 }}
+              className="mt-4 text-gray-400 text-lg md:text-xl max-w-md mx-auto md:mx-0 leading-relaxed"
+            >
+              أطباق مختارة بعناية، تُحضّر طازجة كل يوم. اختبر الجودة اللي بتستحقها.
+            </motion.p>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="mt-8">
+              <button className="bg-[#F5B301] text-black font-extrabold text-lg py-3 px-8 rounded-xl shadow-lg transition-transform hover:scale-105 active:scale-95">
+                اطلب الآن
+              </button>
+            </motion.div>
+          </div>
+
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6 }}
+            className="flex-1 w-full max-w-md"
+          >
+            {/* عرض صورة اللوجو أو صورة ثابتة أنيقة تعبر عن المحل */}
+            <div className="relative aspect-square rounded-3xl overflow-hidden border border-white/5 shadow-2xl bg-black/20">
+               <img src="/logo.png" alt="Shamina" className="w-full h-full object-contain p-8" />
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 2. Quick Offers (Magazine Style) */}
       {offerItems.length > 0 && (
-        <QuickOffers items={offerItems} onSelect={openSheet} />
+        <section className="w-full max-w-7xl mx-auto px-4 py-12 md:px-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+              <span className="w-2 h-8 rounded-md bg-[#F5B301]"></span>
+              عروض التوفير
+            </h2>
+          </div>
+          
+          <div className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {offerItems.map((item) => (
+              <OfferCard key={item._id} item={item} onClick={() => { setSelectedItem(item); setIsSheetOpen(true); }} />
+            ))}
+          </div>
+        </section>
       )}
 
-      <section className="mt-6 px-4 md:px-0">
-        {/* Sticky category tabs — stays pinned to the top while the menu
-            grid scrolls beneath it. */}
+      {/* 3. Menu Categories (Clean & Sticky) */}
+      <section className="max-w-7xl mx-auto px-4 md:px-8 pb-10">
         {categories.length > 0 && (
-          <div className="sticky top-0 z-20 -mx-4 bg-white/90 px-4 py-2 backdrop-blur md:mx-0 md:px-0">
-            <div className="flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <button
-                onClick={() => setActiveCategory('all')}
-                className={`shrink-0 rounded-full px-4 py-2 text-[13px] font-semibold transition-colors ${
-                  activeCategory === 'all' ? 'bg-black text-white' : 'bg-white text-black/60 ring-1 ring-black/10'
-                }`}
-              >
-                الكل
-              </button>
+          <div className="sticky top-0 z-30 -mx-4 px-4 py-4 mb-8 bg-[#0c0a09]/90 backdrop-blur-xl border-b border-white/5 md:mx-0 md:px-0">
+            <div className="flex gap-3 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <CategoryPill label="الكل" active={activeCategory === 'all'} onClick={() => setActiveCategory('all')} />
               {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-[13px] font-semibold transition-colors ${
-                    activeCategory === cat.id ? 'bg-black text-white' : 'bg-white text-black/60 ring-1 ring-black/10'
-                  }`}
-                >
-                  {cat.label}
-                </button>
+                <CategoryPill key={cat.id} label={cat.label} active={activeCategory === cat.id} onClick={() => setActiveCategory(cat.id)} />
               ))}
             </div>
           </div>
         )}
 
-        {isLoading && (
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="animate-pulse rounded-2xl bg-white p-3 ring-1 ring-black/5">
-                <div className="aspect-square w-full rounded-xl bg-black/5" />
-                <div className="mt-2 h-3 w-3/4 rounded bg-black/5" />
-                <div className="mt-2 h-3 w-1/2 rounded bg-black/5" />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {loadError && !isLoading && (
-          <p className="mt-4 text-center text-[13px] text-black/40">تعذّر تحميل المنيو حالياً</p>
-        )}
-
+        {/* 4. Menu Grid (Premium Cards) */}
         {!isLoading && !loadError && (
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            {visibleItems.map((item) => (
-              <button
-                key={item._id}
-                onClick={() => openSheet(item)}
-                className="rounded-2xl bg-white p-3 text-left ring-1 ring-black/5 transition-transform active:scale-[0.98]"
-              >
-                <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/5">
-                  {item.images?.[0] && (
-                    <Image
-                      src={item.images[0]}
-                      alt={item.name?.ar}
-                      fill
-                      sizes="(min-width: 1024px) 22vw, (min-width: 768px) 28vw, 45vw"
-                      className="object-cover"
-                    />
-                  )}
-                </div>
-                <p className="mt-2 text-[13px] font-semibold leading-tight text-black">{item.name?.ar}</p>
-                <p className="mt-1 text-[13px] font-bold text-[#b8891f]">{item.basePrice} ج.م</p>
-              </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {visibleItems.map((item, index) => (
+              <MenuCard key={item._id} item={item} index={index} onClick={() => { setSelectedItem(item); setIsSheetOpen(true); }} />
             ))}
             {visibleItems.length === 0 && (
-              <p className="col-span-full py-6 text-center text-[13px] text-black/40">
-                لا توجد أصناف في هذا القسم
-              </p>
+              <p className="col-span-full py-20 text-center text-gray-500 text-lg">لا توجد أصناف في هذا القسم</p>
             )}
           </div>
         )}
       </section>
 
-      <ItemDetailsSheet item={isSheetOpen ? selectedItem : null} onClose={closeSheet} />
+      <ItemDetailsSheet item={isSheetOpen ? selectedItem : null} onClose={() => setIsSheetOpen(false)} />
     </main>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Quick Offers — dark, "Bazooka"-style auto-scrolling carousel.
-// Full-bleed dark section, 2 cards visible on mobile / 3 on tablet / 4 on
-// desktop, entire card clickable, no separate CTA button.
-// ---------------------------------------------------------------------------
-function QuickOffers({ items, onSelect }) {
-  const scrollRef = useRef(null);
-  const directionRef = useRef(1); // 1 = forward, -1 = backward
+// --- Components ---
 
-  // Auto-advances one card every 3s, then reverses direction once it hits
-  // either end instead of jump-cutting back to the start.
-  useEffect(() => {
-    if (items.length <= 1) return undefined;
+function CategoryPill({ label, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 rounded-xl px-6 py-2.5 text-[15px] font-bold transition-all ${
+        active ? 'bg-[#F5B301] text-black shadow-md' : 'bg-[#1a1715] text-gray-400 border border-white/5 hover:bg-[#25211e] hover:text-white'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
 
-    const timer = setInterval(() => {
-      const container = scrollRef.current;
-      if (!container) return;
-
-      const card = container.firstElementChild;
-      const cardWidth = card ? card.getBoundingClientRect().width : container.clientWidth * 0.45;
-      const gapPx = 12; // matches gap-3 below
-      const step = cardWidth + gapPx;
-      const maxScroll = container.scrollWidth - container.clientWidth;
-
-      let next = container.scrollLeft + step * directionRef.current;
-
-      if (next >= maxScroll - 4) {
-        next = maxScroll;
-        directionRef.current = -1;
-      } else if (next <= 4) {
-        next = 0;
-        directionRef.current = 1;
-      }
-
-      container.scrollTo({ left: next, behavior: 'smooth' });
-    }, 3000);
-
-    return () => clearInterval(timer);
-  }, [items.length]);
+// تصميم كارت الأكل (مناسب للصور المربعة العادية عشان تبقى شيك)
+function MenuCard({ item, index, onClick }) {
+  const name = getItemName(item);
+  const price = getItemPrice(item);
+  const image = getItemImage(item);
 
   return (
-    <section className="w-full bg-black py-6">
-      <div className="px-4 md:px-8">
-        <h2 className="mb-3 text-[16px] font-bold text-white">عروض سريعة</h2>
-      </div>
-
-      <div
-        ref={scrollRef}
-        className="hide-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:px-8"
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-50px' }}
+      transition={{ duration: 0.4, delay: (index % 4) * 0.05 }}
+    >
+      <button
+        onClick={onClick}
+        className="group relative w-full flex flex-col text-right bg-[#141210] rounded-2xl overflow-hidden border border-white/5 hover:border-white/10 transition-all hover:shadow-2xl active:scale-[0.98]"
       >
-        {items.map((item) => (
-          <button
-            key={item._id}
-            onClick={() => onSelect(item)}
-            className="relative h-64 shrink-0 snap-start overflow-hidden rounded-2xl bg-neutral-900 text-left transition-transform active:scale-[0.97] basis-[46%] sm:basis-[31%] lg:basis-[23%] sm:h-72 lg:h-80"
-          >
-            <div className="relative h-[70%] w-full">
-              {item.images?.[0] && (
-                <Image
-                  src={item.images[0]}
-                  alt={item.name?.ar}
-                  fill
-                  sizes="(min-width: 1024px) 23vw, (min-width: 640px) 31vw, 46vw"
-                  className="object-cover"
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-transparent to-transparent" />
-            </div>
+        <div className="relative w-full aspect-[4/3] bg-[#1a1715] overflow-hidden">
+          {image ? (
+            <img src={image} alt={name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-600">بدون صورة</div>
+          )}
+          {/* Overlay متدرج عشان يدمج الصورة مع الكارت */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#141210] via-transparent to-transparent opacity-80" />
+        </div>
+        
+        <div className="p-5 relative z-10 w-full">
+          <h3 className="text-lg font-bold text-gray-100 truncate">{name}</h3>
+          {price != null && (
+            <p className="mt-2 text-xl font-black" style={{ color: BRAND_YELLOW }}>
+              {price} <span className="text-sm font-medium text-gray-400">ج.م</span>
+            </p>
+          )}
+        </div>
+      </button>
+    </motion.div>
+  );
+}
 
-            <div className="px-3 py-2.5">
-              <p className="truncate text-[14px] font-bold text-yellow-400">{item.name?.ar}</p>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="text-[14px] font-bold text-white">{item.basePrice} ج.م</span>
-                {item.oldPrice ? (
-                  // ⚠ ACCESSIBILITY FIX: text-white/40 and text-white/50 both
-                  // failed Lighthouse contrast against dark backgrounds.
-                  // text-gray-400 keeps the muted "crossed-out" look while
-                  // passing contrast checks.
-                  <span className="text-[11px] text-gray-400 line-through">{item.oldPrice} ج.م</span>
-                ) : null}
-              </div>
-            </div>
-          </button>
-        ))}
+// تصميم كروت العروض (أعرض شوية وتلفت الانتباه)
+function OfferCard({ item, onClick }) {
+  const name = getItemName(item);
+  const price = getItemPrice(item);
+  const image = getItemImage(item);
+
+  return (
+    <button
+      onClick={onClick}
+      className="group relative h-72 shrink-0 snap-start basis-[85%] md:basis-[45%] lg:basis-[30%] rounded-3xl overflow-hidden border border-white/10 bg-[#1a1715] text-right transition-transform active:scale-[0.98]"
+    >
+      {image && <Image src={image} alt={name} fill sizes="400px" className="object-cover transition-transform duration-700 group-hover:scale-105" />}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+
+      <div className="absolute bottom-0 w-full p-5">
+        <h3 className="text-2xl font-black text-white drop-shadow-md">{name}</h3>
+        <div className="mt-2 flex items-center justify-end gap-3">
+          {item.oldPrice && <span className="text-sm text-gray-400 line-through">{item.oldPrice} ج.م</span>}
+          {price != null && <span className="text-xl font-bold bg-[#F5B301] text-black px-3 py-1 rounded-lg">{price} ج.م</span>}
+        </div>
       </div>
-    </section>
+    </button>
   );
 }

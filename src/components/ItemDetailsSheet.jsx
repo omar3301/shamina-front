@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { X } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 
+const BRAND_YELLOW = '#F5B301';
+
 // يحدد إن كانت الشاشة الحالية بحجم ديسكتوب (>= 768px) للتحكم في نوع حركة الفتح
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(false);
@@ -26,14 +28,14 @@ export default function ItemDetailsSheet({ item, onClose }) {
   const { addToCart } = useCart();
   const [selections, setSelections] = useState({});
 
-  // استخراج الداتا بشكل دفاعي عشان يشتغل مع الـ MongoDB والـ Mock
+  // استخراج الداتا بشكل دفاعي
   const displayName = item ? item.name?.ar ?? item.name : '';
   const displayDescription = item ? item.description?.ar ?? item.description : '';
   const basePrice = item ? item.basePrice ?? item.price ?? 0 : 0;
   const displayImage = item ? item.images?.[0] ?? item.image : null;
   const optionGroups = item?.optionGroups ?? item?.modifiers ?? [];
 
-  // إعادة ضبط الاختيارات عند فتح صنف جديد
+  // ضبط الاختيارات المبدئية عند فتح الصنف
   useEffect(() => {
     if (!item) return;
     const initial = {};
@@ -41,7 +43,6 @@ export default function ItemDetailsSheet({ item, onClose }) {
       const groupId = group._id ?? group.id;
       const choices = group.choices || group.options || [];
       const isSingle = group.type === 'single' || group.isRequired || group.required;
-      // لو الاختيار إجباري/فردي، اختار أول عنصر افتراضياً، غير كده خليها مصفوفة فاضية
       initial[groupId] = isSingle ? choices[0]?._id ?? choices[0]?.id ?? null : [];
     });
     setSelections(initial);
@@ -62,7 +63,6 @@ export default function ItemDetailsSheet({ item, onClose }) {
         const opt = choices.find((o) => (o._id ?? o.id) === selected);
         if (opt) total += opt.additionalPrice ?? opt.priceModifier ?? 0;
       } else {
-        // التأكد إنها مصفوفة قبل عمل لوب عليها
         (Array.isArray(selected) ? selected : []).forEach((sId) => {
           const opt = choices.find((o) => (o._id ?? o.id) === sId);
           if (opt) total += opt.additionalPrice ?? opt.priceModifier ?? 0;
@@ -72,7 +72,7 @@ export default function ItemDetailsSheet({ item, onClose }) {
     return total;
   }, [item, selections, basePrice, optionGroups]);
 
-  // تجهيز قائمة الإضافات للسلة
+  // تجهيز قائمة الخيارات لعرضها في السلة
   const selectedOptionsList = useMemo(() => {
     if (!item) return [];
     const list = [];
@@ -124,18 +124,18 @@ export default function ItemDetailsSheet({ item, onClose }) {
     <AnimatePresence>
       {item && (
         <>
-          {/* الخلفية المعتمة */}
+          {/* خلفية التعتيم المتدرجة */}
           <motion.div
-            className="fixed inset-0 z-[90] bg-black/50"
+            className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
 
-          {/* المحتوى */}
+          {/* الحاوية المنبثقة بالنمط الداكن الفاخر */}
           <motion.div
-            className="fixed inset-x-0 bottom-0 z-[95] max-h-[88vh] overflow-y-auto rounded-t-[28px] bg-white md:inset-0 md:m-auto md:h-fit md:max-h-[85vh] md:w-full md:max-w-lg md:rounded-[28px]"
+            className="fixed inset-x-0 bottom-0 z-[95] max-h-[90vh] overflow-y-auto rounded-t-[32px] bg-[#141210] border-t border-white/10 text-white md:inset-0 md:m-auto md:h-fit md:max-h-[85vh] md:w-full md:max-w-lg md:rounded-[32px] md:border md:border-white/10 shadow-2xl"
             initial={isDesktop ? { opacity: 0, scale: 0.95 } : { y: '100%' }}
             animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
             exit={isDesktop ? { opacity: 0, scale: 0.95 } : { y: '100%' }}
@@ -146,26 +146,31 @@ export default function ItemDetailsSheet({ item, onClose }) {
             }
           >
             <div className="relative">
+              {/* زر الإغلاق */}
               <button
                 onClick={onClose}
-                className="absolute left-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
+                className="absolute left-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white/80 hover:text-white border border-white/10 backdrop-blur-md transition-colors"
                 aria-label="إغلاق"
               >
                 <X size={18} />
               </button>
 
-              <div className="relative h-52 w-full bg-black/5 md:h-64">
+              {/* حاوية صورة الصنف مع تدرج اندماج ناعم */}
+              <div className="relative h-56 w-full bg-[#1c1917] md:h-64 overflow-hidden">
                 {displayImage && (
                   <Image src={displayImage} alt={displayName} fill className="object-cover" />
                 )}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#141210] via-transparent to-black/20" />
               </div>
 
-              <div className="px-5 pb-6 pt-4">
-                <h2 className="text-[18px] font-bold text-black">{displayName}</h2>
+              <div className="px-6 pb-6 pt-3 text-right">
+                <h2 className="text-[20px] font-black text-white">{displayName}</h2>
                 {displayDescription && (
-                  <p className="mt-1 text-[13px] leading-relaxed text-gray-500">{displayDescription}</p>
+                  <p className="mt-1.5 text-[14px] leading-relaxed text-gray-400">{displayDescription}</p>
                 )}
-                <p className="mt-2 text-[16px] font-bold text-[#FFC629]">{basePrice} ج.م</p>
+                <p className="mt-3 text-[18px] font-black" style={{ color: BRAND_YELLOW }}>
+                  {basePrice} <span className="text-sm font-bold text-gray-400">ج.م</span>
+                </p>
 
                 {optionGroups.map((group) => {
                   const groupId = group._id ?? group.id;
@@ -174,21 +179,19 @@ export default function ItemDetailsSheet({ item, onClose }) {
                   const choices = group.choices || group.options || [];
 
                   return (
-                    <div key={groupId} className="mt-5">
-                      <h3 className="text-[14px] font-bold text-black">
-                        {groupTitle}
+                    <div key={groupId} className="mt-6">
+                      <h3 className="text-[15px] font-bold text-gray-200 flex items-center justify-end gap-1.5">
                         {isRequired && (
-                          <span className="mr-1 text-[11px] font-normal text-gray-500">(مطلوب)</span>
+                          <span className="text-[12px] font-normal text-gray-500">(مطلوب)</span>
                         )}
+                        <span>{groupTitle}</span>
                       </h3>
 
-                      <div className="mt-2.5 space-y-2">
+                      <div className="mt-3 space-y-2.5">
                         {choices.map((opt) => {
                           const optId = opt._id ?? opt.id;
                           const optName = opt.name?.ar ?? opt.name;
                           const optPrice = opt.additionalPrice ?? opt.priceModifier ?? 0;
-                          
-                          // تحديد إن كان الاختيار فردي (إجباري) أو متعدد
                           const isSingle = group.type === 'single' || isRequired;
                           
                           const checked = isSingle
@@ -198,11 +201,13 @@ export default function ItemDetailsSheet({ item, onClose }) {
                           return (
                             <label
                               key={optId}
-                              className={`flex cursor-pointer items-center justify-between rounded-2xl border px-4 py-3 transition-colors ${
-                                checked ? 'border-[#FFC629] bg-[#FFF9E8]' : 'border-black/10 bg-white'
+                              className={`flex cursor-pointer items-center justify-between rounded-2xl border px-4 py-3.5 transition-all ${
+                                checked
+                                  ? 'border-[#F5B301] bg-[#F5B301]/10 text-white'
+                                  : 'border-white/5 bg-[#1c1917]/70 text-gray-300 hover:border-white/10 hover:bg-[#1c1917]'
                               }`}
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3.5">
                                 <input
                                   type={isSingle ? 'radio' : 'checkbox'}
                                   name={groupId}
@@ -212,12 +217,12 @@ export default function ItemDetailsSheet({ item, onClose }) {
                                       ? handleSingleSelect(groupId, optId)
                                       : handleMultiToggle(groupId, optId)
                                   }
-                                  className="h-4 w-4 accent-[#FFC629]"
+                                  className="h-4 w-4 accent-[#F5B301]"
                                 />
-                                <span className="text-[13px] font-medium text-black">{optName}</span>
+                                <span className="text-[14px] font-bold">{optName}</span>
                               </div>
                               {optPrice > 0 && (
-                                <span className="text-[12px] font-semibold text-gray-500">
+                                <span className="text-[13px] font-semibold text-gray-400">
                                   +{optPrice} ج.م
                                 </span>
                               )}
@@ -230,14 +235,14 @@ export default function ItemDetailsSheet({ item, onClose }) {
                 })}
               </div>
 
-              {/* شريط الإجراء */}
-              <div className="sticky bottom-0 border-t border-black/5 bg-white px-5 py-4 z-10">
+              {/* شريط الإجراء السفلي الشفاف والملتصق */}
+              <div className="sticky bottom-0 border-t border-white/10 bg-[#141210]/95 px-6 py-4 backdrop-blur-md z-20">
                 <button
                   onClick={handleAddToCart}
-                  className="flex w-full items-center justify-between rounded-full bg-[#FFC629] px-5 py-3.5 text-[14px] font-bold text-black transition-transform active:scale-[0.98]"
+                  className="flex w-full items-center justify-between rounded-2xl bg-[#F5B301] px-6 py-4 text-[15px] font-black text-black shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.98]"
                 >
-                  <span>أضف للسلة</span>
-                  <span>{totalPrice} ج.م</span>
+                  <span className="text-base font-black">أضف للسلة</span>
+                  <span className="text-base font-black">{totalPrice} ج.م</span>
                 </button>
               </div>
             </div>
